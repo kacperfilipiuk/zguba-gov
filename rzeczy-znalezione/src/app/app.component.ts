@@ -2,6 +2,7 @@
 import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { ReactiveFormsModule, FormBuilder, FormGroup, Validators } from '@angular/forms';
+import { TerritorialUnitsService, TerritorialUnit } from './services/territorial-units.service';
 
 interface FoundItem {
   id: string;
@@ -26,7 +27,6 @@ interface FoundItem {
   };
   categories: string[];
   createdAt: string;
-  photo?: string;
 }
 
 @Component({
@@ -41,10 +41,14 @@ export class AppComponent implements OnInit {
   totalSteps: number = 4;
   showErrorModal: boolean = false;
   errorMessages: string[] = [];
-  photoPreview: string | null = null;
   
   form: FormGroup;
   items: FoundItem[] = [];
+  
+  // Autouzupełnianie
+  filteredUnits: TerritorialUnit[] = [];
+  showAutocomplete: boolean = false;
+  selectedUnitType: TerritorialUnit['type'] | null = null;
   
   categories = [
     { value: 'dokumenty', label: 'Dokumenty' },
@@ -68,12 +72,65 @@ export class AppComponent implements OnInit {
     { value: 'przekazana', label: 'Przekazana organizacji' }
   ];
 
-  constructor(private fb: FormBuilder) {
+  constructor(
+    private fb: FormBuilder,
+    private territorialUnitsService: TerritorialUnitsService
+  ) {
     this.form = this.initializeForm();
   }
 
   ngOnInit(): void {
     this.loadItems();
+    this.setupAutocomplete();
+  }
+
+  private setupAutocomplete(): void {
+    // Nasłuchuj zmian w polu typu samorządu
+    this.form.get('municipalityType')?.valueChanges.subscribe(type => {
+      this.selectedUnitType = type as TerritorialUnit['type'];
+      // Reset nazwy gdy zmienia się typ
+      if (this.form.get('municipalityName')?.value) {
+        this.onMunicipalityNameInput();
+      }
+    });
+  }
+
+  onMunicipalityNameInput(): void {
+    const query = this.form.get('municipalityName')?.value || '';
+    
+    if (query.length < 2) {
+      this.filteredUnits = [];
+      this.showAutocomplete = false;
+      return;
+    }
+
+    this.territorialUnitsService.search(
+      query,
+      this.selectedUnitType || undefined
+    ).then(results => {
+      this.filteredUnits = results;
+      this.showAutocomplete = results.length > 0;
+    });
+  }
+
+  selectUnit(unit: TerritorialUnit): void {
+    // Generuj sugerowany email
+    const suggestedEmail = this.territorialUnitsService.generateContactEmail(unit);
+    
+    this.form.patchValue({
+      municipalityName: unit.name,
+      municipalityType: unit.type,
+      contactEmail: suggestedEmail
+    });
+    this.showAutocomplete = false;
+    this.filteredUnits = [];
+  }
+
+  hideAutocomplete(): void {
+    // Opóźnienie aby kliknięcie w sugestię mogło się wykonać
+    setTimeout(() => {
+      this.showAutocomplete = false;
+    }, 200);
   }
 
   initializeForm(): FormGroup {
@@ -118,21 +175,6 @@ export class AppComponent implements OnInit {
   closeErrorModal(): void {
     this.showErrorModal = false;
     this.errorMessages = [];
-  }
-
-  onPhotoSelected(event: any): void {
-    const file = event.target.files[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onload = (e: any) => {
-        this.photoPreview = e.target.result;
-      };
-      reader.readAsDataURL(file);
-    }
-  }
-
-  removePhoto(): void {
-    this.photoPreview = null;
   }
 
   private getStepErrors(step: number): string[] {
@@ -240,15 +282,13 @@ export class AppComponent implements OnInit {
         contact: this.form.value.contactPerson
       },
       categories: this.form.value.categories,
-      createdAt: new Date().toISOString(),
-      photo: this.photoPreview || undefined
+      createdAt: new Date().toISOString()
     };
 
     this.items.push(newItem);
     this.saveItems();
     alert('✓ Dane zostały pomyślnie udostępnione!');
     this.resetForm();
-    this.photoPreview = null;
     this.currentStep = 1;
   }
 

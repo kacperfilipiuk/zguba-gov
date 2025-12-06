@@ -1,30 +1,31 @@
 // territorial-units.service.ts
 import { Injectable } from '@angular/core';
+import territorialUnitsData from '../../assets/territorial-units.json';
 
 export interface TerritorialUnit {
   name: string;
   type: 'wojewodztwo' | 'powiat' | 'gmina' | 'miasto';
   parentName?: string; // np. dla powiatu: nazwa województwa
   fullName: string; // pełna nazwa z kontekstem
-  id?: string; // ID z API GUS
+  id?: string; // ID z pliku
+  email?: string; // Email z pliku
+  officeName?: string; // Nazwa urzędu
+  voivodeship?: string; // Województwo
+  county?: string; // Powiat
 }
 
-interface GusApiResponse {
-  totalRecords: number;
-  page: number;
-  pageSize: number;
-  results: GusUnit[];
-  links?: {
-    next?: string;
-  };
-}
-
-interface GusUnit {
+interface LocalDataUnit {
   id: string;
   name: string;
   parentId: string;
   level: number;
-  kind?: string; // "1" = powiat, "2" = miasto na prawach powiatu
+  kind: string;
+  type: 'wojewodztwo' | 'powiat' | 'gmina' | 'miasto';
+  hasDescription: boolean;
+  email: string;
+  officeName: string;
+  voivodeship: string;
+  county: string;
 }
 
 @Injectable({
@@ -36,38 +37,50 @@ export class TerritorialUnitsService {
   private loading = false;
   private loaded = false;
 
-  private readonly API_BASE = 'https://bdl.stat.gov.pl/api/v1';
-
   constructor() {
-    this.loadDataFromApi();
+    this.loadDataFromLocalFile();
   }
 
-  private async loadDataFromApi(): Promise<void> {
+  private async loadDataFromLocalFile(): Promise<void> {
     if (this.loading || this.loaded) return;
     
     this.loading = true;
     
     try {
-      console.log('🔄 Rozpoczynam ładowanie danych z API GUS...');
+      console.log('🔄 Rozpoczynam ładowanie danych z lokalnego pliku...');
       
-      // 1. Pobierz województwa (level=2)
-      await this.loadWojewodztwa();
+      const data = territorialUnitsData as LocalDataUnit[];
       
-      // 2. Pobierz powiaty i miasta na prawach powiatu (level=5)
-      await this.loadPowiatyIMiasta();
-      
-      // 3. Pobierz gminy (level=6) - ograniczone do najważniejszych
-      await this.loadGminy();
+      // Mapuj dane z pliku do struktury używanej w aplikacji
+      this.units = data.map(unit => {
+        let fullName = unit.name;
+        
+        // Dodaj kontekst dla pełnej nazwy
+        if (unit.type === 'gmina' || unit.type === 'powiat') {
+          fullName = `${unit.name} (woj. ${unit.voivodeship})`;
+        }
+        
+        return {
+          id: unit.id,
+          name: unit.name,
+          type: unit.type,
+          parentName: unit.voivodeship,
+          fullName: fullName,
+          email: unit.email,
+          officeName: unit.officeName,
+          voivodeship: unit.voivodeship,
+          county: unit.county
+        };
+      });
       
       this.loaded = true;
-      console.log(`✅ Załadowano łącznie ${this.units.length} jednostek terytorialnych z API GUS`);
+      console.log(`✅ Załadowano łącznie ${this.units.length} jednostek terytorialnych z lokalnego pliku`);
       console.log(`   - Województwa: ${this.units.filter(u => u.type === 'wojewodztwo').length}`);
       console.log(`   - Powiaty: ${this.units.filter(u => u.type === 'powiat').length}`);
       console.log(`   - Miasta: ${this.units.filter(u => u.type === 'miasto').length}`);
       console.log(`   - Gminy: ${this.units.filter(u => u.type === 'gmina').length}`);
     } catch (error) {
-      console.error('❌ Błąd podczas ładowania danych z API GUS:', error);
-      // W razie błędu załaduj dane backup
+      console.error('❌ Błąd podczas ładowania danych z lokalnego pliku:', error);
       this.loadBackupData();
     } finally {
       this.loading = false;
@@ -75,129 +88,30 @@ export class TerritorialUnitsService {
   }
 
   private async loadWojewodztwa(): Promise<void> {
-    const url = `${this.API_BASE}/units?level=2&format=json&page-size=100`;
-    const response = await fetch(url);
-    const data: GusApiResponse = await response.json();
-    
-    data.results.forEach(woj => {
-      const nazwa = this.formatWojewodztwoName(woj.name);
-      this.wojewodztwaMap.set(woj.id, nazwa);
-      
-      this.units.push({
-        id: woj.id,
-        name: `Województwo ${nazwa}`,
-        type: 'wojewodztwo',
-        fullName: `Województwo ${nazwa}`
-      });
-    });
+    // Ta metoda nie jest już używana - dane są ładowane z pliku lokalnego
   }
 
   private async loadPowiatyIMiasta(): Promise<void> {
-    let page = 0;
-    let hasMore = true;
-    const pageSize = 100;
-    
-    while (hasMore) {
-      const url = `${this.API_BASE}/units?level=5&format=json&page-size=${pageSize}&page=${page}`;
-      const response = await fetch(url);
-      const data: GusApiResponse = await response.json();
-      
-      data.results.forEach(unit => {
-        const wojewodztwoNazwa = this.getWojewodztwoFromParentId(unit.parentId);
-        const isMiasto = unit.kind === '2';
-        
-        // Formatuj nazwę
-        let nazwa = unit.name;
-        if (isMiasto) {
-          // Usuń "Powiat m. " dla miast
-          nazwa = nazwa.replace(/^Powiat m\.\s*/i, '');
-        }
-        
-        this.units.push({
-          id: unit.id,
-          name: nazwa,
-          type: isMiasto ? 'miasto' : 'powiat',
-          parentName: wojewodztwoNazwa,
-          fullName: `${nazwa} (woj. ${wojewodztwoNazwa})`
-        });
-      });
-      
-      page++;
-      hasMore = data.links?.next !== undefined && page < 10; // Limit dla bezpieczeństwa
-    }
+    // Ta metoda nie jest już używana - dane są ładowane z pliku lokalnego
   }
 
   private async loadGminy(): Promise<void> {
-    // Ładujemy gminy z wielu stron (API ma limit 100 na stronę)
-    const pageSize = 100; // Maksymalny limit API
-    const maxPages = 15; // ~1500 gmin (wystarczające dla autouzupełniania)
-    
-    try {
-      for (let page = 0; page < maxPages; page++) {
-        const url = `${this.API_BASE}/units?level=6&format=json&page-size=${pageSize}&page=${page}`;
-        const response = await fetch(url);
-        const data: GusApiResponse = await response.json();
-        
-        data.results.forEach(unit => {
-          // Pomijamy tylko szczegółowe podpodziały gmin miejsko-wiejskich
-          // kind=1: gmina miejska, kind=2: gmina wiejska, kind=3: gmina miejsko-wiejska
-          // kind=4: część miejska gminy miejsko-wiejskiej, kind=5: część wiejska
-          if (unit.kind === '4' || unit.kind === '5') {
-            return; // Pomiń tylko części gmin miejsko-wiejskich
-          }
-          
-          const wojewodztwoNazwa = this.getWojewodztwoFromUnitId(unit.id);
-          
-          // Formatuj nazwę - w API są już jako "nazwa gminy" bez słowa "Gmina"
-          let nazwa = unit.name;
-          
-          // Dodaj prefix tylko jeśli jeszcze go nie ma
-          if (!nazwa.toLowerCase().includes('gmina') && 
-              !nazwa.toLowerCase().includes('miasto') &&
-              unit.kind !== '1') { // kind=1 to gminy miejskie, często bez prefiksu
-            nazwa = `Gmina ${nazwa}`;
-          }
-          
-          this.units.push({
-            id: unit.id,
-            name: nazwa,
-            type: 'gmina',
-            parentName: wojewodztwoNazwa,
-            fullName: `${nazwa} (woj. ${wojewodztwoNazwa})`
-          });
-        });
-        
-        // Sprawdź czy są jeszcze strony
-        if (!data.links?.next) {
-          break;
-        }
-      }
-      
-      console.log(`✅ Załadowano ${this.units.filter(u => u.type === 'gmina').length} gmin`);
-    } catch (error) {
-      console.warn('Nie udało się załadować gmin:', error);
-    }
+    // Ta metoda nie jest już używana - dane są ładowane z pliku lokalnego
   }
 
   private getWojewodztwoFromParentId(parentId: string): string {
-    // parentId podregionu zawiera kod województwa
-    const wojCode = parentId.substring(0, 4) + '00000000';
-    return this.wojewodztwaMap.get(wojCode) || 'nieznane';
+    // Ta metoda nie jest już używana
+    return 'nieznane';
   }
 
   private getWojewodztwoFromUnitId(unitId: string): string {
-    // ID jednostki zawiera kod województwa w pierwszych cyfrach
-    const wojCode = unitId.substring(0, 4) + '00000000';
-    return this.wojewodztwaMap.get(wojCode) || 'nieznane';
+    // Ta metoda nie jest już używana
+    return 'nieznane';
   }
 
   private formatWojewodztwoName(name: string): string {
-    // API zwraca nazwy wielkimi literami, formatujemy je
-    return name.toLowerCase()
-      .split(' ')
-      .map(word => word.charAt(0).toUpperCase() + word.slice(1))
-      .join(' ')
-      .replace(/-/g, '-');
+    // Ta metoda nie jest już używana
+    return name;
   }
 
   private loadBackupData(): void {
@@ -420,6 +334,45 @@ export class TerritorialUnitsService {
    */
   getByType(type: TerritorialUnit['type']): TerritorialUnit[] {
     return this.units.filter(unit => unit.type === type);
+  }
+
+  /**
+   * Generuje sugerowany email kontaktowy dla jednostki terytorialnej
+   * Preferuje rzeczywisty email z bazy danych, jeśli dostępny
+   */
+  generateContactEmail(unit: TerritorialUnit): string {
+    // Jeśli jednostka ma rzeczywisty email w bazie, użyj go
+    if (unit.email && unit.email.trim()) {
+      // Jeśli są multiple emaile (oddzielone średnikiem lub przecinkiem), użyj pierwszego
+      const firstEmail = unit.email.split(/[;,]/)[0].trim();
+      return firstEmail;
+    }
+
+    // Fallback: generuj email na podstawie nazwy
+    let nazwa = unit.name
+      .replace(/^Województwo\s+/i, '')
+      .replace(/^Powiat\s+(m\.\s+)?/i, '')
+      .replace(/^Gmina\s+/i, '')
+      .replace(/^Miasto\s+/i, '');
+
+    // Normalizuj do slug (bez polskich znaków, małe litery, myślniki zamiast spacji)
+    const slug = this.normalize(nazwa)
+      .replace(/\s+/g, '-')
+      .replace(/[^a-z0-9-]/g, '');
+
+    // Generuj email w zależności od typu
+    switch (unit.type) {
+      case 'wojewodztwo':
+        return `kontakt@${slug}.uw.gov.pl`;
+      case 'powiat':
+        return `starostwo@${slug}.pl`;
+      case 'miasto':
+        return `urzad@um.${slug}.pl`;
+      case 'gmina':
+        return `ug@${slug}.pl`;
+      default:
+        return `kontakt@${slug}.pl`;
+    }
   }
 
   /**
