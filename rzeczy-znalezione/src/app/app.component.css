@@ -245,7 +245,68 @@ textarea {
   min-height: 110px;
 }
 
-.form-row {
+/* Photo Upload */
+.photo-upload {
+  margin-bottom: 16px;
+}
+
+.photo-upload-label {
+  display: block;
+  padding: 20px;
+  border: 2px dashed #2563eb;
+  border-radius: 10px;
+  text-align: center;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  background: #f0f9ff;
+  font-weight: 600;
+  color: #2563eb;
+}
+
+.photo-upload-label:hover {
+  background: #e0f2fe;
+  border-color: #1e40af;
+}
+
+.photo-preview {
+  margin-top: 16px;
+  padding: 16px;
+  background: #f8fafc;
+  border-radius: 10px;
+  border: 1px solid #e2e8f0;
+}
+
+.preview-image {
+  width: 100%;
+  max-width: 300px;
+  margin: 0 auto 12px;
+  border-radius: 8px;
+  overflow: hidden;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.preview-image img {
+  width: 100%;
+  height: auto;
+  display: block;
+}
+
+.btn-remove-photo {
+  background: #ef4444;
+  color: white;
+  border: none;
+  padding: 10px 16px;
+  border-radius: 8px;
+  font-weight: 600;
+  cursor: pointer;
+  font-size: 13px;
+  width: 100%;
+  transition: all 0.2s ease;
+}
+
+.btn-remove-photo:hover {
+  background: #dc2626;
+
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 24px;
@@ -456,7 +517,7 @@ button {
   position: absolute;
   left: 0;
   font-weight: bold;
-  color: #eb2525;
+  color: #2563eb;
   font-size: 18px;
 }
 
@@ -490,59 +551,7 @@ button:focus-visible {
   outline-offset: 2px;
 }
 
-/* Autouzupełnianie */
-.autocomplete-list {
-  position: absolute;
-  top: 100%;
-  left: 0;
-  right: 0;
-  background: white;
-  border: 1px solid #ddd;
-  border-radius: 4px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-  max-height: 300px;
-  overflow-y: auto;
-  z-index: 1000;
-  margin-top: 4px;
-}
-
-.autocomplete-item {
-  padding: 12px 16px;
-  cursor: pointer;
-  border-bottom: 1px solid #f0f0f0;
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  transition: background-color 0.2s;
-}
-
-.autocomplete-item:last-child {
-  border-bottom: none;
-}
-
-.autocomplete-item:hover {
-  background: #f8f9fa;
-}
-
-.autocomplete-type {
-  display: inline-block;
-  background: #0066cc;
-  color: white;
-  font-size: 11px;
-  padding: 2px 8px;
-  border-radius: 3px;
-  margin-left: 8px;
-  text-transform: uppercase;
-  font-weight: 500;
-}
-
-.autocomplete-context {
-  color: #666;
-  font-size: 12px;
-  margin-left: 8px;
-}
-
-/* Dark mode support */
+/* Dark Mode */
 @media (prefers-color-scheme: dark) {
   :host {
     background: linear-gradient(135deg, #0f172a 0%, #1a1f35 100%);
@@ -629,22 +638,5 @@ button:focus-visible {
   .btn-secondary:hover {
     background: #3f4651;
     border-color: #2563eb;
-  }
-
-  .autocomplete-list {
-    background: #3d3d3d;
-    border-color: #555;
-  }
-
-  .autocomplete-item {
-    border-bottom-color: #555;
-  }
-
-  .autocomplete-item:hover {
-    background: #4d4d4d;
-  }
-
-  .autocomplete-context {
-    color: #a0a0a0;
   }
 }
