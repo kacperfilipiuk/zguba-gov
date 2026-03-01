@@ -8,7 +8,7 @@ on:
 
 jobs:
   ci:
-    uses: emilgruzalski/gh-reusable-workflows/.github/workflows/ci-go.yml@4dcebe08497d2dd58a512345197a45ce8d597cb3 # v1.1.0
+    uses: emilgruzalski/gh-reusable-workflows/.github/workflows/ci-go.yml@v1
     with:
       image-name: 'zguba-gov'
       go-version-file: 'go.mod'
@@ -19,5 +19,3 @@ jobs:
     permissions:
       contents: write
       packages: write
-      security-events: write
-      id-token: write
