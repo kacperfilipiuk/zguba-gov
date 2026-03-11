@@ -12,7 +12,7 @@ RUN apk --no-cache add ca-certificates
 WORKDIR /app
 COPY --from=builder /server .
 
-EXPOSE 8000
-ENV PORT=8000
+EXPOSE 80
+ENV PORT=80
 
 ENTRYPOINT ["./server"]
