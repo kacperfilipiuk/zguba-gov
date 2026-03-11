@@ -6,11 +6,11 @@ Built in 24 hours during the [HackNation](https://hacknation.pl/#about) hackatho
 
 ## Architecture
 
-The application is a single Go binary with embedded static assets. It serves both the HTML interface (rendered server-side with HTMX) and the REST/OData API. All data is stored in a local SQLite database.
+The application is a Go binary with embedded static assets, backed by a MySQL database. It serves both the HTML interface (rendered server-side with HTMX) and the REST/OData API.
 
 ```
-                          Zguba.gov
     ┌───────────────────────────────────────────────────┐
+    │                  Zguba.gov                        │
     │                                                   │
     │   ┌─────────────┐    ┌──────────────────────┐     │
     │   │ Gin Router  │───>│ Page Handlers        │     │
@@ -26,14 +26,9 @@ The application is a single Go binary with embedded static assets. It serves bot
     │   ┌─────────────┐    └──────────┬───────────┘     │
     │   │ Embedded    │               │                 │
     │   │ Templates   │    ┌──────────▼───────────┐     │
-    │   │ & Static    │    │ SQLite Database      │     │
-    │   │ Assets      │    │ (zguba_gov.db)       │     │
-    │   └─────────────┘    └─────────────────────-┘     │
-    │                                                   │
-    │   ┌─────────────────────────────────────────┐     │
-    │   │ Municipality Service                    │     │
-    │   │ (embedded territorial-units.json)       │     │
-    │   └─────────────────────────────────────────┘     │
+    │   │ & Static    │    │ MySQL Database       │     │
+    │   │ Assets      │    │ (zguba_gov)          │     │
+    │   └─────────────┘    └──────────────────────┘     │
     │                                                   │
     └───────────────────────────────────────────────────┘
 ```
@@ -48,14 +43,13 @@ The request flow for the wizard UI:
 ## Key features
 
 - Multi-step wizard for registering found items with server-side validation
-- Territorial unit autocomplete covering all Polish voivodeships, counties, and municipalities
+- Territorial unit autocomplete covering all Polish voivodeships, counties, and municipalities (2809 units in MySQL)
 - Items listing with filtering by category, municipality, status, and free-text search
 - JSON and CSV export of found items
 - RESTful API with full CRUD operations
 - OData-compatible endpoint with `$filter`, `$orderby`, `$top`, `$skip`, `$count`
 - DCAT-AP metadata endpoint for dane.gov.pl catalog integration
 - Responsive UI following GOV.PL design guidelines
-- Single binary with embedded static assets — no external file dependencies
 - Health check endpoint for container orchestration
 
 ## Getting started
@@ -63,21 +57,8 @@ The request flow for the wizard UI:
 ### Prerequisites
 
 - Go 1.24+ — [download](https://go.dev/dl/)
-- Docker (optional)
-
-### Build
-
-```bash
-go build -o zguba-gov ./cmd/server
-```
-
-### Run locally
-
-```bash
-go run ./cmd/server
-```
-
-The application starts on [http://localhost:8000](http://localhost:8000).
+- MySQL 8+ — [download](https://dev.mysql.com/downloads/)
+- Docker (recommended)
 
 ### Run with Docker
 
@@ -85,21 +66,38 @@ The application starts on [http://localhost:8000](http://localhost:8000).
 docker compose up --build
 ```
 
-> [!NOTE]
-> The SQLite database file is created automatically on first run. Data persists in the `zguba_gov.db` file in the working directory.
+The application starts on [http://localhost](http://localhost). MySQL is initialized automatically with the schema and territorial units data from `init.sql`.
+
+### Run locally
+
+1. Start a MySQL instance and create the database:
+
+```bash
+mysql -u root -p < init.sql
+```
+
+2. Run the application:
+
+```bash
+DATABASE_URL="root:password@tcp(localhost:3306)/zguba_gov?parseTime=true&charset=utf8mb4" go run ./cmd/server
+```
+
+The application starts on [http://localhost:80](http://localhost:80).
+
+### Build
+
+```bash
+go build -o zguba-gov ./cmd/server
+```
 
 ## Configuration
-
-### Required environment variables
-
-No environment variables are required — the application runs with sensible defaults.
 
 ### Optional environment variables
 
 | Variable | Default | Description |
 |---|---|---|
-| `PORT` | `8000` | HTTP server port |
-| `DATABASE_URL` | `zguba_gov.db` | SQLite database file path |
+| `PORT` | `80` | HTTP server port |
+| `DATABASE_URL` | `root:password@tcp(localhost:3306)/zguba_gov?parseTime=true&charset=utf8mb4` | MySQL DSN |
 | `CORS_ORIGINS` | `http://localhost:4200,http://localhost:3000` | Comma-separated list of allowed CORS origins |
 
 ## API endpoints
@@ -140,19 +138,19 @@ No environment variables are required — the application runs with sensible def
 
 | Problem | Possible cause | Resolution |
 |---|---|---|
-| `cannot unmarshal number into Go struct field` | Inconsistent ID types in `territorial-units.json` | Fixed in codebase — `FlexString` type handles both string and numeric IDs |
 | Autocomplete shows no results | Query too short | Type at least 2 characters to trigger autocomplete |
-| Database locked errors | Multiple processes accessing the same `.db` file | Ensure only one instance is running per database file |
-| Port already in use | Another process on port 8000 | Set `PORT` environment variable to a different port |
+| Connection refused to MySQL | MySQL not running or wrong DSN | Check that MySQL is running and `DATABASE_URL` is correct |
+| Port already in use | Another process on port 80 | Set `PORT` environment variable to a different port |
 | Static assets not loading | Modified embedded files without rebuilding | Run `go build` again — assets are embedded at compile time |
+| `init.sql` not loaded | MySQL volume already initialized | Remove the `mysql-data` volume (`docker compose down -v`) and restart |
 
 ## Security considerations
 
 - The application does not implement authentication — it is designed for internal use within municipal offices
 - Input is validated server-side on every wizard step before database insertion
-- SQL queries use parameterized statements via GORM to prevent SQL injection
+- SQL queries use parameterized statements to prevent SQL injection
 - CORS origins are configurable and restricted by default
-- The Docker image uses a minimal base with no shell access
+- The Docker image uses a minimal Alpine base
 
 ## License
 
