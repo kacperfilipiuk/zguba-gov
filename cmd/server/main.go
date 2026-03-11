@@ -24,10 +24,7 @@ func main() {
 	}
 	defer func() { _ = db.Close() }()
 
-	munSvc, err := municipality.NewService()
-	if err != nil {
-		log.Fatal("municipality service:", err)
-	}
+	munSvc := municipality.NewService(db)
 
 	repo := repository.NewFoundItemRepo(db)
 	apiH := handler.NewAPIHandler(repo)

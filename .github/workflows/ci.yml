@@ -1,4 +1,4 @@
-name: CI - Go
+name: Continuous Integration
 
 on:
   push:
@@ -8,13 +8,9 @@ on:
 
 jobs:
   ci:
-    uses: emilgruzalski/gh-reusable-workflows/.github/workflows/ci-go.yml@v1
+    uses: emilgruzalski/gh-actions/.github/workflows/ci-img-go.yml@v1
     with:
       image-name: 'zguba-gov'
-      go-version-file: 'go.mod'
-      working-directory: '.'
-      dockerfile: './Dockerfile'
-      context: '.'
       push: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
     permissions:
       contents: write

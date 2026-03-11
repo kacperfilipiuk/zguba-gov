@@ -252,24 +252,15 @@ func (r *FoundItemRepo) queryItems(query string, args ...any) ([]model.FoundItem
 	var items []model.FoundItem
 	for rows.Next() {
 		var fi model.FoundItem
-		var createdStr, updatedStr string
 		if err := rows.Scan(
 			&fi.ID, &fi.MunicipalityName, &fi.MunicipalityType, &fi.MunicipalityEmail,
 			&fi.ItemName, &fi.ItemCategory, &fi.ItemDate, &fi.ItemLocation,
 			&fi.ItemStatus, &fi.ItemDescription,
 			&fi.PickupDeadline, &fi.PickupLocation, &fi.PickupHours, &fi.PickupContact,
 			&fi.Categories,
-			&createdStr, &updatedStr,
+			&fi.CreatedAt, &fi.UpdatedAt,
 		); err != nil {
 			return nil, err
-		}
-		fi.CreatedAt, _ = time.Parse("2006-01-02 15:04:05", createdStr)
-		fi.UpdatedAt, _ = time.Parse("2006-01-02 15:04:05", updatedStr)
-		if fi.CreatedAt.IsZero() {
-			fi.CreatedAt, _ = time.Parse(time.RFC3339, createdStr)
-		}
-		if fi.UpdatedAt.IsZero() {
-			fi.UpdatedAt, _ = time.Parse(time.RFC3339, updatedStr)
 		}
 		items = append(items, fi)
 	}
