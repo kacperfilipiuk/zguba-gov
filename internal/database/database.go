@@ -25,8 +25,8 @@ func Open(dsn string) (*sql.DB, error) {
 }
 
 func migrate(db *sql.DB) error {
-	_, err := db.Exec(`
-		CREATE TABLE IF NOT EXISTS found_items (
+	queries := []string{
+		`CREATE TABLE IF NOT EXISTS found_items (
 			id                 VARCHAR(36) PRIMARY KEY,
 			municipality_name  VARCHAR(255) NOT NULL,
 			municipality_type  VARCHAR(100) NOT NULL,
@@ -48,7 +48,25 @@ func migrate(db *sql.DB) error {
 			INDEX idx_found_items_category (item_category),
 			INDEX idx_found_items_name (item_name),
 			INDEX idx_found_items_created (created_at)
-		) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-	`)
-	return err
+		) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
+		`CREATE TABLE IF NOT EXISTS territorial_units (
+			id            VARCHAR(10) PRIMARY KEY,
+			name          VARCHAR(255) NOT NULL,
+			type          VARCHAR(50) NOT NULL,
+			email         VARCHAR(255) NOT NULL DEFAULT '',
+			office_name   VARCHAR(255) NOT NULL DEFAULT '',
+			voivodeship   VARCHAR(100) NOT NULL DEFAULT '',
+			county        VARCHAR(100) NOT NULL DEFAULT '',
+			name_normalized VARCHAR(255) NOT NULL DEFAULT '',
+			INDEX idx_tu_type (type),
+			INDEX idx_tu_name_normalized (name_normalized)
+		) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
+	}
+
+	for _, q := range queries {
+		if _, err := db.Exec(q); err != nil {
+			return err
+		}
+	}
+	return nil
 }

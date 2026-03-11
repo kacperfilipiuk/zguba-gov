@@ -24,7 +24,7 @@ func main() {
 	}
 	defer func() { _ = db.Close() }()
 
-	munSvc, err := municipality.NewService()
+	munSvc, err := municipality.NewService(db)
 	if err != nil {
 		log.Fatal("municipality service:", err)
 	}
