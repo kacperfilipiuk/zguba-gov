@@ -14,6 +14,5 @@ COPY --from=builder /server .
 
 EXPOSE 8000
 ENV PORT=8000
-ENV DATABASE_URL=/app/data/zguba.db
 
 ENTRYPOINT ["./server"]

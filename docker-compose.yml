@@ -4,9 +4,25 @@ services:
     ports:
       - "8000:8000"
     environment:
-      - DATABASE_URL=/app/data/zguba.db
+      - DATABASE_URL=root:password@tcp(mysql:3306)/zguba_gov?parseTime=true&charset=utf8mb4
+    depends_on:
+      mysql:
+        condition: service_healthy
+
+  mysql:
+    image: mysql:8
+    environment:
+      MYSQL_ROOT_PASSWORD: password
+      MYSQL_DATABASE: zguba_gov
+    ports:
+      - "3306:3306"
     volumes:
-      - app-data:/app/data
+      - mysql-data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
 
 volumes:
-  app-data:
+  mysql-data:
