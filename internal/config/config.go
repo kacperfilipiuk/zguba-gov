@@ -10,7 +10,7 @@ type Config struct {
 
 func Load() *Config {
 	return &Config{
-		Port:        getEnv("PORT", "8000"),
+		Port:        getEnv("PORT", "80"),
 		DatabaseURL: getEnv("DATABASE_URL", "root:password@tcp(localhost:3306)/zguba_gov?parseTime=true&charset=utf8mb4"),
 		CORSOrigins: getEnv("CORS_ORIGINS", "http://localhost:4200,http://localhost:3000"),
 	}
