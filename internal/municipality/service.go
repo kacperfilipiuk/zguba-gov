@@ -1,78 +1,29 @@
 package municipality
 
 import (
-	"embed"
-	"encoding/json"
-	"fmt"
-	"sort"
+	"database/sql"
 	"strings"
 	"unicode"
 
 	"golang.org/x/text/unicode/norm"
 )
 
-//go:embed territorial-units.json
-var dataFS embed.FS
-
-type FlexString string
-
-func (f *FlexString) UnmarshalJSON(data []byte) error {
-	if len(data) > 0 && data[0] == '"' {
-		var s string
-		if err := json.Unmarshal(data, &s); err != nil {
-			return err
-		}
-		*f = FlexString(s)
-		return nil
-	}
-	var n json.Number
-	if err := json.Unmarshal(data, &n); err != nil {
-		return err
-	}
-	*f = FlexString(fmt.Sprintf("%07s", n.String()))
-	return nil
-}
-
 type TerritorialUnit struct {
-	ID          FlexString `json:"id"`
-	Name        string     `json:"name"`
-	Type        string     `json:"type"`
-	Email       string     `json:"email,omitempty"`
-	OfficeName  string     `json:"officeName,omitempty"`
-	Voivodeship string     `json:"voivodeship,omitempty"`
-	County      string     `json:"county,omitempty"`
-}
-
-type searchEntry struct {
-	unit       TerritorialUnit
-	normalized string
+	ID          string `json:"id"`
+	Name        string `json:"name"`
+	Type        string `json:"type"`
+	Email       string `json:"email,omitempty"`
+	OfficeName  string `json:"officeName,omitempty"`
+	Voivodeship string `json:"voivodeship,omitempty"`
+	County      string `json:"county,omitempty"`
 }
 
 type Service struct {
-	units   []TerritorialUnit
-	indexed []searchEntry
+	db *sql.DB
 }
 
-func NewService() (*Service, error) {
-	data, err := dataFS.ReadFile("territorial-units.json")
-	if err != nil {
-		return nil, err
-	}
-
-	var units []TerritorialUnit
-	if err := json.Unmarshal(data, &units); err != nil {
-		return nil, err
-	}
-
-	indexed := make([]searchEntry, len(units))
-	for i, u := range units {
-		indexed[i] = searchEntry{
-			unit:       u,
-			normalized: normalize(u.Name),
-		}
-	}
-
-	return &Service{units: units, indexed: indexed}, nil
+func NewService(db *sql.DB) *Service {
+	return &Service{db: db}
 }
 
 func (s *Service) Search(query, unitType string) []TerritorialUnit {
@@ -82,38 +33,38 @@ func (s *Service) Search(query, unitType string) []TerritorialUnit {
 
 	q := normalize(query)
 
-	type scored struct {
-		unit  TerritorialUnit
-		score int
-	}
+	var rows *sql.Rows
+	var err error
 
-	var results []scored
-	for _, e := range s.indexed {
-		if unitType != "" && e.unit.Type != unitType {
-			continue
+	if unitType != "" {
+		rows, err = s.db.Query(
+			"SELECT id, name, type, email, office_name, voivodeship, county FROM territorial_units WHERE type = ? AND name_normalized LIKE ? ORDER BY LOCATE(?, name_normalized), name LIMIT 20",
+			unitType, "%"+q+"%", q,
+		)
+	} else {
+		rows, err = s.db.Query(
+			"SELECT id, name, type, email, office_name, voivodeship, county FROM territorial_units WHERE name_normalized LIKE ? ORDER BY LOCATE(?, name_normalized), name LIMIT 20",
+			"%"+q+"%", q,
+		)
+	}
+	if err != nil {
+		return nil
+	}
+	defer func() { _ = rows.Close() }()
+
+	var results []TerritorialUnit
+	for rows.Next() {
+		var u TerritorialUnit
+		if err := rows.Scan(&u.ID, &u.Name, &u.Type, &u.Email, &u.OfficeName, &u.Voivodeship, &u.County); err != nil {
+			return nil
 		}
-		idx := strings.Index(e.normalized, q)
-		if idx < 0 {
-			continue
-		}
-		// Score: exact prefix match = 0, contains = position
-		results = append(results, scored{unit: e.unit, score: idx})
+		results = append(results, u)
 	}
 
-	sort.Slice(results, func(i, j int) bool {
-		return results[i].score < results[j].score
-	})
-
-	limit := 20
-	if len(results) < limit {
-		limit = len(results)
+	if results == nil {
+		return []TerritorialUnit{}
 	}
-
-	out := make([]TerritorialUnit, limit)
-	for i := 0; i < limit; i++ {
-		out[i] = results[i].unit
-	}
-	return out
+	return results
 }
 
 func (s *Service) GenerateEmail(unit TerritorialUnit) string {
@@ -122,7 +73,6 @@ func (s *Service) GenerateEmail(unit TerritorialUnit) string {
 	}
 
 	name := strings.ToLower(normalize(unit.Name))
-	// Remove type prefix
 	for _, prefix := range []string{"powiat ", "gmina ", "miasto "} {
 		name = strings.TrimPrefix(name, prefix)
 	}

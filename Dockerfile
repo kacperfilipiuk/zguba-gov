@@ -12,8 +12,7 @@ RUN apk --no-cache add ca-certificates
 WORKDIR /app
 COPY --from=builder /server .
 
-EXPOSE 8000
-ENV PORT=8000
-ENV DATABASE_URL=/app/data/zguba.db
+EXPOSE 80
+ENV PORT=80
 
 ENTRYPOINT ["./server"]
